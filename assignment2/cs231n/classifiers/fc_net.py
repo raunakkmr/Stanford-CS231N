@@ -250,7 +250,7 @@ class FullyConnectedNet(object):
         # self.bn_params[1] to the forward pass for the second batch normalization #
         # layer, etc.                                                              #
         ############################################################################
-        caches = []
+        caches, dropout_caches = [], []
         out = X
         for i in range(self.num_layers):
             W, b = self.params['W'+str(i+1)], self.params['b'+str(i+1)]
@@ -263,6 +263,9 @@ class FullyConnectedNet(object):
                     out, layer_cache = affine_ln_relu_forward(out, W, b, gamma, beta, self.bn_params[i])
                 else:
                     out, layer_cache = affine_relu_forward(out, W, b)
+                if self.use_dropout:
+                    out, dropout_cache = dropout_forward(out, self.dropout_param)
+                    dropout_caches.append(dropout_cache)
             else:
                 out, layer_cache = affine_forward(out, W, b)
             caches.append(layer_cache)
@@ -299,6 +302,9 @@ class FullyConnectedNet(object):
             if i == self.num_layers - 1:
                 dout, dW, db = affine_backward(dscores, cache)
             else:
+                if self.use_dropout:
+                    dropout_cache = dropout_caches[i]
+                    dout = dropout_backward(dout, dropout_cache)
                 if self.normalization == 'batchnorm':
                     dout, dW, db, dgamma, dbeta = affine_bn_relu_backward(dout, cache)
                     grads['gamma'+str(i+1)], grads['beta'+str(i+1)] = dgamma, dbeta
