@@ -752,7 +752,17 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     # the bulk of the code is similar to both train-time batch normalization  #
     # and layer normalization!                                                # 
     ###########################################################################
-    pass
+    n, c, h, w = x.shape
+    x = x.reshape(n*G, h*w*c//G) # Changed.
+    x = x.T
+    sample_mean, sample_var = x.mean(axis=0), x.var(axis=0)
+    x_zero = x - sample_mean
+    x_normalized = (x - sample_mean) / np.sqrt(sample_var + eps)
+    x, x_normalized = x.T, x_normalized.T
+    x = x.reshape(n, c, h, w)  # Changed.
+    x_normalized = x_normalized.reshape(n, c, h, w) # Changed.
+    out = gamma * x_normalized + beta
+    cache = (G, x, x_zero, x_normalized, sample_mean, sample_var, eps, gamma, beta)
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -778,7 +788,32 @@ def spatial_groupnorm_backward(dout, cache):
     # TODO: Implement the backward pass for spatial group normalization.      #
     # This will be extremely similar to the layer norm implementation.        #
     ###########################################################################
-    pass
+    n, c, h, w = dout.shape
+    G, x, x_zero, x_normalized, sample_mean, sample_var, eps, gamma, _ = cache
+
+    dxhat = dout * gamma
+
+    x_zero = x_zero.T
+    x_zero = x_zero.reshape(n*G, h*w*c//G)
+    dxhat = dxhat.reshape(n*G, h*w*c//G)
+    x_zero = x_zero.T
+    dxhat = dxhat.T
+    nprime = dxhat.shape[0]
+
+    dvar = -0.5 * (sample_var + eps)**(-1.5) * np.sum(dxhat * x_zero, axis=0)
+    dmean =  -1.0 / np.sqrt(sample_var + eps) * np.sum(dxhat, axis=0) + -2.0 * dvar / nprime * np.sum(x_zero, axis=0)
+    dx = dxhat / np.sqrt(sample_var + eps) + 2 * dvar / nprime * x_zero + dmean / nprime
+
+    x_zero = x_zero.T
+    dxhat = dxhat.T
+    dx = dx.T
+    x_zero = x_zero.reshape(n, c, h, w)
+    dxhat = dxhat.reshape(n, c, h, w)
+    dx = dx.reshape(n, c, h, w)
+
+    dgamma = np.sum(dout * x_normalized, axis=(0,2,3), keepdims=True)
+    dbeta = np.sum(dout, axis=(0,2,3), keepdims=True)
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
