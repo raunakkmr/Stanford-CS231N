@@ -34,7 +34,9 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     # hidden state and any values you need for the backward pass in the next_h   #
     # and cache variables respectively.                                          #
     ##############################################################################
-    pass
+    out = x @ Wx + prev_h @ Wh + b
+    next_h = np.tanh(out)
+    cache = (out, x, prev_h, Wx, Wh, b)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -63,7 +65,13 @@ def rnn_step_backward(dnext_h, cache):
     # HINT: For the tanh function, you can compute the local derivative in terms #
     # of the output value from tanh.                                             #
     ##############################################################################
-    pass
+    out, x, prev_h, Wx, Wh, b = cache
+    dout = 1.0 / np.cosh(out)**2 * dnext_h
+    dx = dout @ Wx.T
+    dprev_h = dout @ Wh.T
+    dWx = x.T @ dout
+    dWh = prev_h.T @ dout
+    db = dout.sum(axis=0)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -94,7 +102,17 @@ def rnn_forward(x, h0, Wx, Wh, b):
     # input data. You should use the rnn_step_forward function that you defined  #
     # above. You can use a for loop to help compute the forward pass.            #
     ##############################################################################
-    pass
+    N, T, _ = x.shape
+    H = h0.shape[1]
+    h = np.zeros((N, T, H))
+    cache = []
+    prev_h = h0
+
+    for t in range(T):
+      next_h, step_cache = rnn_step_forward(x[:,t,:], prev_h, Wx, Wh, b)
+      prev_h = next_h
+      h[:,t,:] = next_h
+      cache.append(step_cache)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
